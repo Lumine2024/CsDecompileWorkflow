@@ -1,0 +1,36 @@
+{
+  "inputPath": "./input",
+  "outputPath": "./output",
+  "cacheDir": "./.cache",
+  "dryRun": false,
+  "aggressiveMode": true,
+  "phases": {
+    "discovery": true,
+    "indexing": true,
+    "repair": true,
+    "cleanup": true,
+    "clustering": true,
+    "output": true
+  },
+  "repair": {
+    "fixSetterValueParam": true,
+    "fixCompilerConventionMembers": true,
+    "fixDelegatePatterns": true,
+    "fixConstructors": true
+  },
+  "cleanup": {
+    "removeDoWhileFalse": true,
+    "removeConstantConditions": true,
+    "removeMeaninglessSwitches": true,
+    "removeDeadCode": true,
+    "removeUnreferencedLocals": true,
+    "removeEmptyBlocks": true,
+    "removeGotoLabelGarbage": true,
+    "removeNoiseTryCatch": false,
+    "minConfidence": 0.75
+  },
+  "clustering": {
+    "minOccurrences": 2,
+    "enableRoleTagging": true
+  }
+}

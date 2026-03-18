@@ -1,0 +1,26 @@
+{
+  "name": "cs-decompile-workflow",
+  "version": "0.1.0",
+  "description": "Automated repair, de-obfuscation preprocessing and structured analysis for ILSpy-decompiled C# projects",
+  "type": "module",
+  "engines": { "node": ">=20.0.0" },
+  "bin": { "csdeob": "./dist/cli/index.js" },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli/index.ts",
+    "start": "node dist/cli/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "diff": "^7.0.0",
+    "fast-glob": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.0",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.15.0",
+    "typescript": "^5.5.0"
+  }
+}

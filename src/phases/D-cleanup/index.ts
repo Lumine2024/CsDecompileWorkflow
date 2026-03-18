@@ -137,16 +137,15 @@ function removeDoWhileFalse(
   // Simple single-level do { ... } while(false); removal
   // Only when there's no break in the inner block
   const regex = /do\s*\{([\s\S]*?)\}\s*while\s*\(\s*false\s*\)\s*;/g;
-  let result = content;
-  let offset = 0;
-  let m: RegExpExecArray | null;
-  const copy = content;
-  const regex2 = /do\s*\{([\s\S]*?)\}\s*while\s*\(\s*false\s*\)\s*;/g;
 
-  while ((m = regex2.exec(copy)) !== null) {
+  // Collect all matches on the original content first
+  const pending: Array<{ index: number; length: number; inner: string }> = [];
+  let m: RegExpExecArray | null;
+
+  while ((m = regex.exec(content)) !== null) {
     const inner = m[1] ?? '';
-    const lineStart = lineOf(copy, m.index);
-    const lineEnd = lineOf(copy, m.index + m[0].length);
+    const lineStart = lineOf(content, m.index);
+    const lineEnd = lineOf(content, m.index + m[0].length);
     // Don't transform if there's a break (it changes semantics)
     if (/\bbreak\b/.test(inner)) {
       suspectedJunk.push({
@@ -177,7 +176,7 @@ function removeDoWhileFalse(
         applied: !dryRun,
       });
       if (!dryRun) {
-        result = result.replace(m[0], inner.trim());
+        pending.push({ index: m.index, length: m[0].length, inner: inner.trim() });
       }
     } else {
       suspectedJunk.push({
@@ -192,6 +191,12 @@ function removeDoWhileFalse(
     }
   }
 
+  // Apply replacements in reverse order so earlier indices remain valid
+  let result = content;
+  for (let i = pending.length - 1; i >= 0; i--) {
+    const { index, length, inner } = pending[i]!;
+    result = result.slice(0, index) + inner + result.slice(index + length);
+  }
   return result;
 }
 
@@ -203,14 +208,15 @@ function removeConstantConditions(
   minConf: number,
   dryRun: boolean,
 ): string {
-  let result = content;
+  // Collect all replacements on the original content, then apply in reverse
+  const pending: Array<{ index: number; length: number; replacement: string }> = [];
+  let m: RegExpExecArray | null;
 
   // Remove: if (false) { ... }
   const ifFalseRegex = /if\s*\(\s*false\s*\)\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
-  let m: RegExpExecArray | null;
-  while ((m = ifFalseRegex.exec(result)) !== null) {
+  while ((m = ifFalseRegex.exec(content)) !== null) {
     const confidence = 0.85;
-    const lineStart = lineOf(result, m.index);
+    const lineStart = lineOf(content, m.index);
     if (confidence >= minConf) {
       transforms.push({
         id: nextId(),
@@ -225,14 +231,12 @@ function removeConstantConditions(
         reason: 'if(false) block never executes - dead code',
         applied: !dryRun,
       });
-      if (!dryRun) {
-        result = result.replace(m[0], '');
-      }
+      if (!dryRun) pending.push({ index: m.index, length: m[0].length, replacement: '' });
     } else {
       suspectedJunk.push({
         filePath,
         lineStart,
-        lineEnd: lineOf(result, m.index + m[0].length),
+        lineEnd: lineOf(content, m.index + m[0].length),
         kind: 'constant_false_if',
         snippet: m[0].slice(0, 80),
         reason: 'if(false) dead code block',
@@ -243,9 +247,9 @@ function removeConstantConditions(
 
   // Remove: while (false) { ... }
   const whileFalseRegex = /while\s*\(\s*false\s*\)\s*\{[^{}]*\}/g;
-  while ((m = whileFalseRegex.exec(result)) !== null) {
+  while ((m = whileFalseRegex.exec(content)) !== null) {
     const confidence = 0.7;
-    const lineStart = lineOf(result, m.index);
+    const lineStart = lineOf(content, m.index);
     if (confidence >= minConf) {
       transforms.push({
         id: nextId(),
@@ -260,14 +264,12 @@ function removeConstantConditions(
         reason: 'while(false) block never executes',
         applied: !dryRun,
       });
-      if (!dryRun) {
-        result = result.replace(m[0], '');
-      }
+      if (!dryRun) pending.push({ index: m.index, length: m[0].length, replacement: '' });
     } else {
       suspectedJunk.push({
         filePath,
         lineStart,
-        lineEnd: lineOf(result, m.index + m[0].length),
+        lineEnd: lineOf(content, m.index + m[0].length),
         kind: 'while_false',
         snippet: m[0].slice(0, 80),
         reason: 'while(false) dead code',
@@ -278,10 +280,10 @@ function removeConstantConditions(
 
   // Unwrap: if (true) { ... }
   const ifTrueRegex = /if\s*\(\s*true\s*\)\s*\{([\s\S]*?)\}/g;
-  while ((m = ifTrueRegex.exec(result)) !== null) {
+  while ((m = ifTrueRegex.exec(content)) !== null) {
     const inner = m[1] ?? '';
     const confidence = 0.85;
-    const lineStart = lineOf(result, m.index);
+    const lineStart = lineOf(content, m.index);
     if (confidence >= minConf) {
       transforms.push({
         id: nextId(),
@@ -296,14 +298,12 @@ function removeConstantConditions(
         reason: 'if(true) always executes - unwrap inner block',
         applied: !dryRun,
       });
-      if (!dryRun) {
-        result = result.replace(m[0], inner.trim());
-      }
+      if (!dryRun) pending.push({ index: m.index, length: m[0].length, replacement: inner.trim() });
     } else {
       suspectedJunk.push({
         filePath,
         lineStart,
-        lineEnd: lineOf(result, m.index + m[0].length),
+        lineEnd: lineOf(content, m.index + m[0].length),
         kind: 'constant_true_if',
         snippet: m[0].slice(0, 80),
         reason: 'if(true) wrapping - can be unwrapped',
@@ -312,6 +312,12 @@ function removeConstantConditions(
     }
   }
 
+  // Apply in reverse order so earlier indices stay valid
+  let result = content;
+  pending.sort((a, b) => b.index - a.index);
+  for (const { index, length, replacement } of pending) {
+    result = result.slice(0, index) + replacement + result.slice(index + length);
+  }
   return result;
 }
 
@@ -402,7 +408,7 @@ function removeDeadGotoLabels(
             applied: !dryRun,
           });
           if (!dryRun) {
-            result = result.replace(deadLabelRegex, '');
+            result = result.slice(0, labelMatch.index) + result.slice(labelMatch.index + labelMatch[0].length);
           }
         } else {
           suspectedJunk.push({
@@ -512,6 +518,8 @@ function removeUnreferencedLocals(
         });
         if (!dryRun) {
           result = result.slice(0, m.index) + result.slice(m.index + m[0].length);
+          // Reset lastIndex to the removal point so the next exec sees the right position
+          localDeclRegex.lastIndex = m.index;
         }
       } else {
         suspectedJunk.push({

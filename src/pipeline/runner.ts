@@ -26,7 +26,7 @@ const PHASE_CACHE: Record<string, string> = {
 };
 
 function shouldRunPhase(phases: string[], phaseId: string): boolean {
-  return phases.includes('all') || phases.includes(phaseId);
+  return phases.includes('ALL') || phases.includes('all') || phases.includes(phaseId);
 }
 
 async function tryLoadCache<T>(cacheDir: string, fileName: string): Promise<T | undefined> {

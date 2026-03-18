@@ -153,9 +153,11 @@ function fixSetterValueParam(
         applied: !dryRun,
       });
       if (!dryRun) {
-        result =
-          result.slice(0, m.index + m[1]!.length + m[0]!.indexOf(m[1]!)) +
-          result.slice(m.index).replace(new RegExp(`\\b${obfName}\\b`), 'value');
+        // Locate the obfuscated name precisely within the match, then replace by index
+        const obfIdx = m.index + m[0]!.lastIndexOf(obfName);
+        result = result.slice(0, obfIdx) + 'value' + result.slice(obfIdx + obfName.length);
+        // Adjust lastIndex for the length change (obfName → 'value')
+        setterAssignRegex.lastIndex = obfIdx + 'value'.length;
       }
     }
   }
@@ -329,7 +331,10 @@ function fixInvalidIdentifiers(
         applied: !dryRun,
       });
       if (!dryRun) {
-        result = result.slice(0, m.index) + m[0]!.replace(new RegExp(`\\b${kw}\\b`), `@${kw}`) + result.slice(m.index + m[0]!.length);
+        const replacement = m[0]!.replace(new RegExp(`\\b${kw}\\b`), `@${kw}`);
+        result = result.slice(0, m.index) + replacement + result.slice(m.index + m[0]!.length);
+        // Adjust lastIndex for the extra '@' character that was inserted
+        paramRegex.lastIndex = m.index + replacement.length;
       }
     }
   }
